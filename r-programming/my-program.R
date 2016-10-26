@@ -97,8 +97,6 @@ View(raw.data)
 
 # How many rows and columns? ("dimensions" of the data frame)
 dim(raw.data)
-str(raw.data)
-
 
 ## An initial inspection of the data
 
@@ -109,10 +107,19 @@ str(raw.data)
 
 dim(raw.data)
 # Check for missing values
+all(is.na(raw.data))
 any(is.na(raw.data))
+sum(is.na(raw.data))
+
 
 # Account for empty strings
 raw.data[raw.data == ""] <- NA
+
+# Frage?
+# Wird die Berechnung des Mittelwerts auf der rechten Seite
+# während der Ersetzung auf der linken Seite bei jeder Iteration
+# neu berechnet?
+raw.data$A2[is.na(raw.data$A2)] <- mean(raw.data$A2, na.rm = TRUE)
 
 # Drop rows with NaN values
 na.raw.inds <- which(apply(is.na(raw.data), 1, any))
@@ -172,7 +179,7 @@ print(paste(dim(raw.data), dim(ext.raw.data), sep = " vs. "))
 ## Export data to csv for inspection in an external editor
 
 write.table(
-  raw.data,
+  ext.raw.data,
   "binarized_credit_data.csv",
   col.names = T,
   row.names = F,
@@ -191,13 +198,21 @@ data <- as.data.frame(apply(data, 2, as.numeric))
 all(sapply(data, is.numeric))
 
 table(data[, "Class"])
+
 # Count the non-zero entries of each attribute for each class
+# Wieviele von Null verschiedene Eintraege gibt es?
 agg <-
-  aggregate(subset(data, select = -Class), by = list(Class = data[, "Class"]),
+  aggregate(subset(data, select = -Class), 
+            by = list(Class = data[, "Class"]),
             function(x) {
               length(x[x > 0])
             })
 agg[, c(1:10)]
+# %ROTA%:
+# Sind die Werte in den Variablen A9, A10, A11 von Null verschieden,
+# dann ist die Wahrscheinlichkeit hoeher, dass der Kredit
+# gewaehrt wird.
+# D. h. das sind die Treiber der Analyse!
 
 ## Printing some discriminative attributes
 
@@ -235,9 +250,10 @@ for (i in inds.decreasing[1:15]) {
 }
 
 ## Selecting discriminative attributes by Pearsons's correlation
+# Welche Attribute beeinflussen die Zielvariable 'Class' am meisten?
 
 # Compute Pearson's correlation between attributes and the class labels
-test <- cor(subset(data, select = -Class), as.numeric(data[, "Class"]))
+test <- abs(cor(subset(data, select = -Class), as.numeric(data[, "Class"])))
 sort(test, decreasing = T)[1:10]
 top5 <- rownames(test)[order(test, decreasing = T)][1:5]
 top5
@@ -252,16 +268,18 @@ selection <-
 # Builtin-function 'pairs'
 pairs(data[, selection],
       main = "Scatterplots for credit attributes",
-      pch = 21,
-      bg = c("red", "green3")[data$Class + 1])
+      pch = 21,  # ?
+      bg = c("red", "green3")[data$Class + 1])  # ?
 
-# To beautify the labeling of the plots, we should convert the class into a factor
+# To beautify the labeling of the plots, we should convert the class
+# into a factor
 data[, "Class"] <-
   factor(data[, "Class"],
          levels = c("0", "1"),
          labels = c("denial", "approval"))
 
-# define a function to render the diagonal of the scatter plot matrix in a nicer way
+# define a function to render the diagonal of the scatter plot matrix
+# in a nicer way
 multi_colored_kde <- function(data, mapping, ...) {
   ggplot(data = data, mapping = mapping) +
     geom_density(mapping = aes_string(color = "Class"), fill = NA)
@@ -273,7 +291,7 @@ ggpairs(
   columns = selection,
   title = "Scatterplot matrix",
   mapping = ggplot2::aes_string(color = "Class"),
-  upper = "blank",
+  upper = "blank",  # Teil ueber der Diagonalen ist weiss
   diag  = list(continuous = multi_colored_kde),
   lower = list(continuous = wrap("points", alpha = 0.2)),
   axisLabels = "none"
@@ -302,20 +320,21 @@ source('read_in_credit_data.R')
 source('preprocess_credit_data.R')
 source('scatter_plot_matrix.R')
 
-
+#-------------------------------------------------------------------------------
 
 ## Pre-filtering of attributes (needed for some methods)
 
 # Separate the class from the rest of the data
 classes <- data[, "Class"]
-data <- subset(data, select = -Class)
+data <- subset(data, select = -Class)  # Class soll als Farbe dargestellt werden
 
 # Remove columns with little variation
-data <- data[, -c(nearZeroVar(data))]
+data <- data[, -c(caret::nearZeroVar(data))]
+# nur Attribute, die eine Varianz haben, die stark von Null verschieden ist
 
 # Center and scale columns (necessary for some ML-methods)
 data.orig <- data
-data <- scale(data)
+data <- scale(data)  # mean = 0, std = 1 (z-value?)
 
 ## Compute a PCA
 pca <- prcomp(data)
@@ -395,9 +414,13 @@ clusplot(
   ylab = "PC2"
 )
 
-
+#-------------------------------------------------------------------------------
 
 ## Learning a decision tree model
+# Beim Entscheidungsbaum besser auf un-normalisierten Daten rechnen
+# damit ich weiss, was die Attribute bedeuten.
+# Das ist auch unproblematisch moeglich, da der Entscheidungsbaum
+# nicht mit Distanzen arbeitet.
 set.seed(51)
 train.sample <- sample(nrow(data), floor(0.75 * 653))
 str(train.sample)
@@ -412,12 +435,18 @@ prop.table(table(classes))
 prop.table(table(cl.train))
 prop.table(table(cl.test))
 
+# d.train = Datensatz
+# cl.train = Zielattribut (= Class) als separten Datensatz muss uebergeben
+# werden.
 credit.model <- C5.0(d.train, cl.train)
 
 summary(credit.model)
 
 plot(credit.model)
 
+# Confusion matrix aus predition des decision trees
+# und der wahrheit, die in den Daten steht
+# = confusion matrix
 cred.preds <- predict(credit.model, d.test)
 
 CrossTable(
@@ -432,13 +461,13 @@ CrossTable(
 ## Visualizing the decision tree
 plot(credit.model)
 
-
+#-------------------------------------------------------------------------------
 
 # Learning a linear model to classify the data
-Note that this abuses a thresholding a linear regression to classify data
+# Note that this abuses a thresholding a linear regression to classify data
 
 tmp.train.df <- as.data.frame(d.train)
-tmp.train.df$Class <- as.numeric(cl.train == "approval")
+tmp.train.df$Class <- as.numeric(cl.train == 1)
 
 linear.model <- lm(Class ~ ., data = tmp.train.df)
 # Inspect the model
@@ -446,6 +475,8 @@ summary(linear.model)
 
 # Make predictions on new data points
 linear.preds <- as.numeric(predict(linear.model, d.test) > 0.5)
+# nur die Werte, die groesser als 0.5 sind, sind unsere Predictions
+
 # Inspect the results
 CrossTable(
   cl.test,
