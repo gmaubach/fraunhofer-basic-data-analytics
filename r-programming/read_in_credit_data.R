@@ -1,0 +1,1 @@
+data <- read.csv("credit.csv", header=T, sep=",", stringsAsFactors=F)
