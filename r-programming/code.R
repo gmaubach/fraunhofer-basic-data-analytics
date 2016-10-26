@@ -19,11 +19,15 @@ scale.fun <- function(vals) {return(abs( vals / max(vals) * 100 ))}
 quality.levels <- factor(c(1,2,3), labels=c("low", "mid", "hi"))
 # Create a vector with 100 entries for each level
 qualities <- rep(quality.levels, 100)
-table(qualities)
+table(qualities, useNA = "always")
 
 # Model relationship between price & customer satisfaction for different quality levels
 dat <- data.frame(satisfaction=NA, price=NA, quality=qualities)
+print(dat)
+table(dat, useNA = "always")
 
+# Fuelle die Variable 'quality' mit Werten aus dem Vector
+# der mit x:y bestimmt ist, z. B. 50:149
 dat$price[dat$quality=="low"] <- 50:149
 dat$price[dat$quality=="mid"] <- 150:249
 dat$price[dat$quality=="hi"] <- 250:349
@@ -31,6 +35,15 @@ dat$price[dat$quality=="hi"] <- 250:349
 dat$satisfaction[dat$quality=="low"] <- scale.fun(0.1 * 1:100 + rnorm(100))
 dat$satisfaction[dat$quality=="mid"] <- scale.fun(0.75 * 1:100 + rnorm(100))
 dat$satisfaction[dat$quality=="hi"] <- scale.fun(runif(100))
+
+hist(dat$price)
+hist(dat$satisfaction)
+
+plot(dat$price)
+plot(dat$satisfaction)
+
+hist(dat$satisfaction[dat$quality == "mid"])
+
 
 ## A basic plot example
 
@@ -41,7 +54,7 @@ hist(dat$satisfaction, main="Distribution of people\'s satisfaction", xlab="")
 ## A simple lattice example
 
 # Create a scatterplot for each quality level
-xyplot(satisfaction ~ price | quality, data = dat)
+lattice::xyplot(satisfaction ~ price | quality, data = dat)
 
 ## A simple ggplot2 example (1/2)
 
