@@ -487,6 +487,7 @@ CrossTable(
   dnn = c("actual approval", "predicted approval")
 )
 
+#-------------------------------------------------------------------------------
 
 ## Using a support vector machine
 
@@ -497,7 +498,9 @@ dat.train.df$Class <- cl.train
 
 svm.classifier <-
   ksvm(Class ~ ., data = dat.train.df, kernel = "vanilladot")
+# vanilladot = default Kernel = linearer Kernel wie lineare Regression
 svm.classifier
+# rbtdot = Gauss Kern
 
 svm.preds <- predict(svm.classifier, d.test)
 head(svm.preds)
